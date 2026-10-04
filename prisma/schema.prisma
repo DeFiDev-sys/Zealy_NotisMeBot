@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model TelegramOwner {
+  id        String   @id @default(cuid())
+  chatId    String   @unique
+  username  String?
+  firstName String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Project {
+  id                   String   @id @default(cuid())
+  url                  String   @unique
+  projectSlug          String   @unique
+  projectName          String
+  isActive             Boolean  @default(true)
+  scanIntervalMinutes  Int      @default(5)
+  notifyOnInitialScan  Boolean  @default(false)
+  lastCheckedAt        DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  quests      Quest[]
+  scans       Scan[]
+  notifications NotificationLog[]
+}
+
+model Quest {
+  id             String   @id @default(cuid())
+  questId        String   @unique
+  projectId      String
+  questName      String
+  questUrl       String
+  reward         String?
+  firstDetectedAt DateTime @default(now())
+  lastSeenAt     DateTime @default(now())
+  notificationSent Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([questId])
+}
+
+model Scan {
+  id              String   @id @default(cuid())
+  projectId       String
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  status          String   @default("PENDING")
+  questsFound     Int      @default(0)
+  newQuestsFound  Int      @default(0)
+  errorMessage    String?
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([startedAt])
+}
+
+model NotificationLog {
+  id          String   @id @default(cuid())
+  projectId   String
+  message     String
+  status      String   @default("PENDING")
+  sentAt      DateTime?
+  errorMessage String?
+  createdAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+}
