@@ -3,6 +3,7 @@ import { projectService } from "../services/project-service";
 import { scanService } from "../services/scan-service";
 import { ownerService } from "../services/owner-service";
 import { notificationService } from "../services/notification-service";
+import { schedulerService } from "../services/scheduler-service";
 import { prisma } from "../database/prisma";
 import { env, isOwner } from "../config/env";
 import { createLogger } from "../utils/logger";
@@ -26,9 +27,11 @@ export function registerCommands(bot: Telegraf<Context>) {
   bot.command("projects", handleProjects);
   bot.command("addproject", handleAddProject);
   bot.command("scan", handleScan);
+  bot.command("scanall", handleScanAll);
   bot.command("pause", handlePause);
   bot.command("resume", handleResume);
   bot.command("remove", handleRemove);
+  bot.command("scheduler", handleScheduler);
 
   bot.action(/confirm_delete:.*/, handleConfirmDelete);
   bot.action("cancel_delete", handleCancelDelete);
@@ -71,10 +74,12 @@ async function handleHelp(ctx: Context) {
       "/resume <slug> - Resume monitoring\n" +
       "/remove <slug> - Remove a project\n\n" +
       "<b>Scanning:</b>\n" +
-      "/scan - Scan all active projects\n" +
-      "/scan <slug> - Scan specific project\n\n" +
+      "/scan - Scan all active projects (respects interval)\n" +
+      "/scan <slug> - Scan specific project\n" +
+      "/scanall - Force scan ALL projects (bypasses interval)\n\n" +
       "<b>Status:</b>\n" +
       "/status - Show bot status\n" +
+      "/scheduler - Show scheduler status & next scans\n" +
       "/help - Show this help message",
     { parse_mode: "HTML" }
   );
@@ -98,8 +103,10 @@ async function handleStatus(ctx: Context) {
 
   const lastScan = await prisma.scan.findFirst({
     orderBy: { startedAt: "desc" },
-    select: { startedAt: true },
+    select: { startedAt: true, completedAt: true },
   });
+
+  const lastScanTime = lastScan?.completedAt ?? lastScan?.startedAt;
 
   const statusEmoji = "🟢";
 
@@ -109,7 +116,7 @@ async function handleStatus(ctx: Context) {
       `📊 Projects: ${projects.length}\n` +
       `📋 Total Quests: ${totalQuests}\n` +
       `🔔 New Quests Today: ${newToday}\n\n` +
-      `Last Scan: ${lastScan ? formatRelativeTime(lastScan.startedAt) : "Never"}`,
+      `Last Scan: ${lastScanTime ? formatRelativeTime(lastScanTime) : "Never"}`,
     { parse_mode: "HTML" }
   );
 }
@@ -159,20 +166,43 @@ async function handleAddProject(ctx: Context) {
   const url = args[0];
 
   if (!url) {
-    await ctx.reply("❌ Usage: /addproject <Zealy URL>\nExample: /addproject https://zealy.io/cw/minebit/questboard/");
+    await ctx.reply("❌ Usage: /addproject <URL>\nExample: /addproject https://zealy.io/cw/minebit/questboard/");
     return;
   }
 
   try {
     const project = await projectService.create({ url });
-    await ctx.reply(
-      `✅ <b>Project Added</b>\n\n` +
-        `🏗 <b>${project.projectName}</b>\n` +
-        `🔗 ${project.url}\n` +
-        `⏱ Interval: ${project.scanIntervalMinutes} minutes\n\n` +
-        `Initial scan completed. Use /scan ${project.projectSlug} to scan manually.`,
-      { parse_mode: "HTML" }
-    );
+    
+    const statusMsg = await ctx.reply(`🔍 Running initial scan for ${project.projectName}...`);
+    
+    try {
+      const result = await scanService.scanProject(project.id);
+      await ctx.telegram.editMessageText(
+        chatId,
+        statusMsg.message_id,
+        undefined,
+        `✅ <b>Project Added & Initial Scan Complete</b>\n\n` +
+          `🏗 <b>${project.projectName}</b>\n` +
+          `🔗 ${project.url}\n` +
+          `⏱ Interval: ${project.scanIntervalMinutes} minutes\n\n` +
+          `Quests Found: ${result.questsFound}\n` +
+          `New Quests: ${result.newQuestsFound} (baseline established)\n\n` +
+          `Auto-scan runs every ${project.scanIntervalMinutes} minutes. Use /scan ${project.projectSlug} to scan manually.`,
+        { parse_mode: "HTML" }
+      );
+    } catch (scanError) {
+      await ctx.telegram.editMessageText(
+        chatId,
+        statusMsg.message_id,
+        undefined,
+        `⚠ <b>Project Added</b> but initial scan failed:\n${scanError instanceof Error ? scanError.message : "Unknown error"}\n\n` +
+          `🏗 <b>${project.projectName}</b>\n` +
+          `🔗 ${project.url}\n` +
+          `⏱ Interval: ${project.scanIntervalMinutes} minutes\n\n` +
+          `Will retry on next scheduled scan. Use /scan ${project.projectSlug} to retry manually.`,
+        { parse_mode: "HTML" }
+      );
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to add project";
     await ctx.reply(`❌ ${message}`);
@@ -239,15 +269,22 @@ async function handleScan(ctx: Context) {
 
     let totalQuests = 0;
     let totalNew = 0;
+    const results: string[] = [];
 
     for (const project of activeProjects) {
-      if (scanService.isScanning(project.id)) continue;
+      if (scanService.isScanning(project.id)) {
+        results.push(`⏭ ${project.projectName} - already scanning`);
+        continue;
+      }
 
       try {
         const result = await scanService.scanProject(project.id);
         totalQuests += result.questsFound;
         totalNew += result.newQuestsFound;
+        results.push(`✅ ${project.projectName}: ${result.questsFound} quests, ${result.newQuestsFound} new`);
       } catch (error) {
+        const msg = error instanceof Error ? error.message : "Unknown error";
+        results.push(`❌ ${project.projectName}: ${msg}`);
         logger.error({ error, projectId: project.id }, "Scan failed");
       }
     }
@@ -260,10 +297,59 @@ async function handleScan(ctx: Context) {
         `Projects Scanned: ${activeProjects.length}\n` +
         `Total Quests Found: ${totalQuests}\n` +
         `Total New Quests: ${totalNew}\n` +
-        `${totalNew > 0 ? "Notifications sent." : "No new quests."}`,
+        `${totalNew > 0 ? "Notifications sent." : "No new quests."}\n\n` +
+        `<b>Details:</b>\n` + results.join("\n"),
       { parse_mode: "HTML" }
     );
   }
+}
+
+async function handleScanAll(ctx: Context) {
+  const chatId = String(ctx.chat?.id);
+
+  if (!isOwner(chatId)) {
+    await ctx.reply("⛔ Unauthorized.");
+    return;
+  }
+
+  const projects = await projectService.findAll();
+  const activeProjects = projects.filter((p) => p.isActive);
+
+  if (activeProjects.length === 0) {
+    await ctx.reply("📭 No active projects to scan.");
+    return;
+  }
+
+  const statusMsg = await ctx.reply(`🔄 Force scanning ALL ${activeProjects.length} projects (bypassing interval)...`);
+
+  let totalQuests = 0;
+  let totalNew = 0;
+  const results: string[] = [];
+
+  for (const project of activeProjects) {
+    try {
+      const result = await scanService.scanProject(project.id);
+      totalQuests += result.questsFound;
+      totalNew += result.newQuestsFound;
+      results.push(`✅ ${project.projectName}: ${result.questsFound} quests, ${result.newQuestsFound} new`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error";
+      results.push(`❌ ${project.projectName}: ${msg}`);
+      logger.error({ error, projectId: project.id }, "Force scan failed");
+    }
+  }
+
+  await ctx.telegram.editMessageText(
+    chatId,
+    statusMsg.message_id,
+    undefined,
+      `🔄 <b>Force Scan Complete</b>\n\n` +
+        `Projects Scanned: ${activeProjects.length}\n` +
+        `Total Quests Found: ${totalQuests}\n` +
+        `Total New Quests: ${totalNew}\n\n` +
+        `<b>Details:</b>\n` + results.join("\n"),
+    { parse_mode: "HTML" }
+  );
 }
 
 async function handlePause(ctx: Context) {
@@ -385,6 +471,46 @@ async function handleCancelDelete(ctx: Context) {
   }
 
   await ctx.editMessageText("❌ Deletion cancelled.", { parse_mode: "HTML" });
+}
+
+async function handleScheduler(ctx: Context) {
+  const chatId = String(ctx.chat?.id);
+
+  if (!isOwner(chatId)) {
+    await ctx.reply("⛔ Unauthorized.");
+    return;
+  }
+
+  const projects = await projectService.findAll();
+  const now = new Date();
+  const intervalMs = env.DEFAULT_SCAN_INTERVAL * 60 * 1000;
+
+  let message = `⏰ <b>Scheduler Status</b>\n\n`;
+  message += `🟢 Running: Yes\n`;
+  message += `⏱ Check Interval: ${env.DEFAULT_SCAN_INTERVAL} minutes\n\n`;
+  message += `<b>Next Scheduled Scans:</b>\n`;
+
+  for (const project of projects) {
+    if (!project.isActive) {
+      message += `\n🔴 ${project.projectName} - Paused`;
+      continue;
+    }
+    const lastChecked = project.lastCheckedAt ? new Date(project.lastCheckedAt) : null;
+    if (!lastChecked) {
+      message += `\n🟡 ${project.projectName} - Never scanned (due now)`;
+      continue;
+    }
+    const timeSinceLastCheck = now.getTime() - lastChecked.getTime();
+    const timeUntilNext = intervalMs - timeSinceLastCheck;
+    const status = timeUntilNext <= 0 ? "🔴 Overdue" : "🟢 OK";
+    const minutesUntil = Math.ceil(timeUntilNext / 60000);
+    message += `\n${status} ${project.projectName} - Last: ${formatRelativeTime(lastChecked)}`;
+    if (timeUntilNext > 0) {
+      message += ` (~${minutesUntil}min until next)`;
+    }
+  }
+
+  await ctx.reply(message, { parse_mode: "HTML" });
 }
 
 function formatRelativeTime(date: Date): string {

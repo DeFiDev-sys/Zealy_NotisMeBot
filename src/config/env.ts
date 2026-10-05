@@ -5,9 +5,9 @@ const envSchema = z.object({
   OWNER_TELEGRAM_CHAT_ID: z.string().optional(),
   DATABASE_URL: z.string().default("file:./dev.db"),
   SCRAPER_HEADLESS: z.string().default("true"),
-  SCRAPER_TIMEOUT: z.string().default("30000"),
+  SCRAPER_TIMEOUT: z.string().default("60000"),
   SCRAPER_RETRIES: z.string().default("3"),
-  DEFAULT_SCAN_INTERVAL: z.string().default("5"),
+  DEFAULT_SCAN_INTERVAL: z.string().default("2"),
   MIN_EXPECTED_QUEST_RATIO: z.string().default("0.25"),
   LOG_LEVEL: z.string().default("info"),
 });

@@ -6,12 +6,18 @@ import { Telegraf } from "telegraf";
 
 const logger = createLogger("notification-service");
 
+const MAX_NOTIFICATION_LOGS_PER_PROJECT = 50;
+
 export interface NotificationService {
   sendNewQuestsNotification(
     chatId: string,
     projectName: string,
     projectSlug: string,
     quests: NormalizedQuest[]
+  ): Promise<void>;
+  sendCycleSummaryNotification(
+    chatId: string,
+    message: string
   ): Promise<void>;
   logNotification(
     projectId: string,
@@ -79,6 +85,23 @@ export const notificationService: NotificationService = {
     }
   },
 
+  async sendCycleSummaryNotification(
+    chatId: string,
+    message: string
+  ) {
+    try {
+      await bot.telegram.sendMessage(chatId, message, {
+        parse_mode: "HTML",
+        link_preview_options: { is_disabled: true },
+      });
+
+      logger.info({ chatId }, "Cycle summary sent");
+    } catch (error) {
+      logger.error({ error, chatId }, "Failed to send cycle summary");
+      throw error;
+    }
+  },
+
   async logNotification(
     projectId: string,
     message: string,
@@ -94,5 +117,27 @@ export const notificationService: NotificationService = {
         errorMessage,
       },
     });
+
+    // Prune old notification logs beyond the most recent 50 per project
+    try {
+      const keepIds = await prisma.notificationLog.findMany({
+        where: { projectId },
+        orderBy: { createdAt: "desc" },
+        take: MAX_NOTIFICATION_LOGS_PER_PROJECT,
+        select: { id: true },
+      });
+
+      if (keepIds.length >= MAX_NOTIFICATION_LOGS_PER_PROJECT) {
+        const idsToKeep = keepIds.map((r) => r.id);
+        await prisma.notificationLog.deleteMany({
+          where: {
+            projectId,
+            id: { notIn: idsToKeep },
+          },
+        });
+      }
+    } catch (pruneError) {
+      logger.warn({ error: pruneError, projectId }, "Failed to prune notification logs");
+    }
   },
 };

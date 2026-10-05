@@ -39,14 +39,19 @@ async function enrichWithStats(project: {
     prisma.scan.findFirst({
       where: { projectId: project.id },
       orderBy: { startedAt: "desc" },
-      select: { startedAt: true },
+      select: { startedAt: true, completedAt: true },
     }),
   ]);
+
+  const scanTime = lastScan?.completedAt ?? lastScan?.startedAt ?? null;
+  const lastScanAt = (scanTime && project.lastCheckedAt)
+    ? (scanTime > project.lastCheckedAt ? scanTime : project.lastCheckedAt)
+    : (scanTime ?? project.lastCheckedAt);
 
   return {
     ...project,
     questCount,
-    lastScanAt: lastScan?.startedAt ?? null,
+    lastScanAt,
   };
 }
 
@@ -70,7 +75,7 @@ export const projectService: ProjectService = {
         url: parsed.url,
         projectSlug: parsed.projectSlug,
         projectName: parsed.projectName,
-        scanIntervalMinutes: input.scanIntervalMinutes ?? 5,
+        scanIntervalMinutes: input.scanIntervalMinutes ?? 2,
         notifyOnInitialScan: input.notifyOnInitialScan ?? false,
       },
     });

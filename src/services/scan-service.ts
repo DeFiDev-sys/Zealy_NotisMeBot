@@ -54,12 +54,22 @@ export const scanService: ScanService = {
 
     scanLocks.set(projectId, true);
 
-    const scan = await prisma.scan.create({
-      data: {
+    const scan = await prisma.scan.upsert({
+      where: { projectId },
+      create: {
         projectId,
         status: "PENDING",
         questsFound: 0,
         newQuestsFound: 0,
+        startedAt: new Date(),
+      },
+      update: {
+        status: "PENDING",
+        questsFound: 0,
+        newQuestsFound: 0,
+        startedAt: new Date(),
+        completedAt: null,
+        errorMessage: null,
       },
     });
 
@@ -123,6 +133,9 @@ export const scanService: ScanService = {
           errorMessage,
         },
       });
+
+      // Update lastCheckedAt even on failure so scheduler doesn't retry immediately
+      await projectService.updateLastChecked(projectId);
 
       logger.error({ projectId, error: errorMessage }, "Scan failed");
       throw error;

@@ -12,7 +12,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "db:vacuum": "tsx scripts/vacuum-db.ts"
   },
   "dependencies": {
     "@prisma/client": "5.22.0",

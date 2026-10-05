@@ -80,11 +80,39 @@ export class ZealyQuestScraper {
         waitUntil: "domcontentloaded",
         timeout: env.SCRAPER_TIMEOUT,
       });
+      logger.debug({ url, projectSlug }, "Page loaded, waiting for quest content");
+
+      // Wait longer for network to settle and content to render
+      try {
+        await page.waitForLoadState("networkidle", { timeout: 15000 });
+      } catch {
+        logger.warn({ projectSlug }, "Network idle timeout, continuing anyway");
+      }
 
       await this.waitForQuestContent(page);
 
-      const anchorData = await page.evaluate(EXTRACT_ANCHORS_SCRIPT) as AnchorData[];
+      let anchorData: AnchorData[] = [];
+      try {
+        const result = await page.evaluate(EXTRACT_ANCHORS_SCRIPT);
+        anchorData = (result as AnchorData[]) ?? [];
+      } catch (evalError) {
+        const msg = evalError instanceof Error ? evalError.message : String(evalError);
+        logger.error({ error: msg, projectSlug }, "Failed to evaluate anchor extraction script");
+        const title = await page.title().catch(() => "unknown");
+        logger.debug({ title, projectSlug }, "Page title after eval error");
+      }
+      
       logger.info({ count: anchorData.length, projectSlug }, "Found quest anchors");
+      
+      if (anchorData.length === 0) {
+        logger.warn({ projectSlug, url }, "No quest anchors found - page may have changed structure or blocked");
+        const title = await page.title().catch(() => "unknown");
+        logger.debug({ title, projectSlug }, "Page title");
+        
+        // Dump some page content for debugging
+        const bodyText = await page.locator('body').textContent().catch(() => "");
+        logger.debug({ bodyText: bodyText?.substring(0, 500), projectSlug }, "Page body preview");
+      }
 
       for (const data of anchorData) {
         try {
@@ -101,14 +129,16 @@ export class ZealyQuestScraper {
       logger.info({ projectSlug, ...result }, "Scan completed");
       return result;
     } catch (error) {
-      logger.error({ error, projectSlug }, "Scan failed");
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      logger.error({ error: errorMessage, stack: errorStack, projectSlug }, "Scan failed");
       return {
         quests: [],
         newQuests: [],
         questsFound: 0,
         newQuestsFound: 0,
         status: "failed",
-        errorMessage: error instanceof Error ? error.message : "Unknown error",
+        errorMessage,
       };
     } finally {
       await page.close();
@@ -122,8 +152,9 @@ export class ZealyQuestScraper {
         state: "attached",
       });
       await page.waitForTimeout(1000);
-    } catch {
-      logger.warn("Quest anchors not found within timeout, continuing anyway");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.warn({ error: msg, projectSlug: "" }, "Quest anchors not found within timeout, continuing anyway");
     }
   }
 

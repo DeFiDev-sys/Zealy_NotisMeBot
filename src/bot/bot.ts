@@ -52,7 +52,11 @@ export function createBot(): Telegraf<Context> {
 
 export async function startBot(bot: Telegraf<Context>) {
   try {
-    await bot.launch();
+    // Don't await bot.launch() - it resolves only when the bot stops.
+    // Catch and log errors, but let execution continue so scheduler can start.
+    bot.launch().catch((error) => {
+      logger.error({ error }, "Bot launch failed");
+    });
     logger.info("Bot started successfully");
   } catch (error) {
     logger.error({ error }, "Failed to start bot");
