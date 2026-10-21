@@ -5,6 +5,7 @@ import { questService } from "./quest-service";
 import { prisma } from "../database/prisma";
 import { createLogger } from "../utils/logger";
 import { env } from "../config/env";
+import { ConcurrencyLimiter } from "../utils/concurrency-limiter";
 
 const logger = createLogger("scheduler-service");
 
@@ -13,6 +14,9 @@ let isRunning = false;
 
 // Tick every 15 seconds; per-project interval is enforced by due check
 const TICK_MS = 15_000;
+
+// Concurrency limiter for parallel scans (serializes Zealy network calls via shared browser)
+const scanConcurrencyLimiter = new ConcurrencyLimiter(env.MAX_CONCURRENT_SCANS);
 
 export interface SchedulerService {
   start(): void;
@@ -156,6 +160,28 @@ async function sendCycleSummary(results: ScanResultSummary[]) {
   }
 }
 
+function isDue(project: { lastCheckedAt: Date | null; scanIntervalMinutes: number }): boolean {
+  if (!project.lastCheckedAt) return true;
+  const intervalMs = project.scanIntervalMinutes * 60 * 1000;
+  return Date.now() - new Date(project.lastCheckedAt).getTime() >= intervalMs;
+}
+
+function buildProcessArgs(project: {
+  id: string;
+  projectName: string;
+  projectSlug: string;
+  notifyOnInitialScan: boolean;
+  questCount: number;
+}) {
+  return {
+    id: project.id,
+    projectName: project.projectName,
+    projectSlug: project.projectSlug,
+    notifyOnInitialScan: project.notifyOnInitialScan,
+    questCount: project.questCount,
+  };
+}
+
 async function runScheduledScans() {
   if (isRunning) {
     logger.debug("Scheduler already running, skipping cycle");
@@ -170,41 +196,76 @@ async function runScheduledScans() {
     const projects = await projectService.findAll();
     const now = new Date();
 
-    logger.debug({ activeProjects: projects.filter(p => p.isActive).length, totalProjects: projects.length }, "Scheduler cycle started");
+    const dueProjects = projects.filter(p => p.isActive && isDue(p));
+    const skippedProjects = projects.filter(p => !p.isActive || !isDue(p));
 
-    for (const project of projects) {
-      if (!project.isActive) {
-        results.push({ projectId: project.id, projectName: project.projectName, projectSlug: project.projectSlug, scanned: false, questsFound: 0, newQuests: 0, error: "Paused" });
-        continue;
+    logger.debug({
+      activeProjects: projects.filter(p => p.isActive).length,
+      dueProjects: dueProjects.length,
+      skippedProjects: skippedProjects.length,
+      totalProjects: projects.length
+    }, "Scheduler cycle started");
+
+    // Add skipped projects to results with appropriate status
+    for (const project of skippedProjects) {
+      results.push({
+        projectId: project.id,
+        projectName: project.projectName,
+        projectSlug: project.projectSlug,
+        scanned: false,
+        questsFound: 0,
+        newQuests: 0,
+        error: project.isActive ? "Not due" : "Paused"
+      });
+    }
+
+    if (dueProjects.length === 0) {
+      logger.debug("No projects due for scan");
+      await sendCycleSummary(results);
+      return;
+    }
+
+    // Stagger launches to avoid burst requests to Zealy
+    const staggerMs = Math.min(5000, Math.max(2000, 3000 / Math.max(1, dueProjects.length)));
+
+    const scanPromises = dueProjects.map(async (project, index) => {
+      // Stagger start: each project waits index * staggerMs before starting
+      if (index > 0) {
+        const delay = index * staggerMs + Math.floor(Math.random() * 2000); // add jitter
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
 
-      const lastChecked = project.lastCheckedAt ? new Date(project.lastCheckedAt) : null;
-      const intervalMs = project.scanIntervalMinutes * 60 * 1000;
-      const timeSinceLastCheck = lastChecked ? now.getTime() - lastChecked.getTime() : null;
-
-      logger.debug({ projectId: project.id, projectName: project.projectName, intervalMs, timeSinceLastCheck, lastChecked }, "Checking if project due for scan");
-
-      if (!lastChecked || now.getTime() - lastChecked.getTime() >= intervalMs) {
+      return scanConcurrencyLimiter.run(async () => {
         logger.info({ projectId: project.id, projectName: project.projectName }, "Running scheduled scan");
-        const result = await processProject({
-          id: project.id,
-          projectName: project.projectName,
-          projectSlug: project.projectSlug,
-          notifyOnInitialScan: project.notifyOnInitialScan,
-          questCount: project.questCount,
-        });
-        results.push(result);
+        return processProject(buildProcessArgs(project));
+      });
+    });
+
+    const settled = await Promise.allSettled(scanPromises);
+
+    for (const outcome of settled) {
+      if (outcome.status === "fulfilled") {
+        results.push(outcome.value);
       } else {
-        logger.debug({ projectId: project.id, projectName: project.projectName }, "Project not due yet");
-        results.push({ projectId: project.id, projectName: project.projectName, projectSlug: project.projectSlug, scanned: false, questsFound: 0, newQuests: 0, error: "Not due" });
+        logger.error({ error: outcome.reason }, "Scan promise rejected");
+        results.push({
+          projectId: "unknown",
+          projectName: "unknown",
+          projectSlug: "unknown",
+          scanned: true,
+          questsFound: 0,
+          newQuests: 0,
+          error: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason)
+        });
       }
     }
 
     const duration = Date.now() - cycleStart;
     logger.info({ duration, projectsScanned: results.filter(r => r.scanned).length }, "Scheduler cycle completed");
 
-    // Send summary notification
-    await sendCycleSummary(results);
+    // Send summary notification (results are sorted by project name for consistency)
+    const sortedResults = [...results].sort((a, b) => a.projectName.localeCompare(b.projectName));
+    await sendCycleSummary(sortedResults);
   } catch (error) {
     logger.error({ error }, "Scheduler cycle failed");
   } finally {

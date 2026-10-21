@@ -10,6 +10,7 @@ const envSchema = z.object({
   DEFAULT_SCAN_INTERVAL: z.string().default("2"),
   MIN_EXPECTED_QUEST_RATIO: z.string().default("0.25"),
   LOG_LEVEL: z.string().default("info"),
+  MAX_CONCURRENT_SCANS: z.string().default("2"),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -30,6 +31,7 @@ export const env = {
   DEFAULT_SCAN_INTERVAL: parseInt(parsed.data.DEFAULT_SCAN_INTERVAL, 10),
   MIN_EXPECTED_QUEST_RATIO: parseFloat(parsed.data.MIN_EXPECTED_QUEST_RATIO),
   LOG_LEVEL: parsed.data.LOG_LEVEL,
+  MAX_CONCURRENT_SCANS: parseInt(parsed.data.MAX_CONCURRENT_SCANS, 10),
 };
 
 export function isOwner(chatId: string): boolean {

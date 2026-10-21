@@ -10,8 +10,16 @@ export function normalizeQuestUrl(href: string, baseUrl: string = "https://zealy
 }
 
 export function extractQuestIdFromHref(href: string): string | null {
-  const segments = href.split("/").filter(Boolean);
-  return segments.at(-1) ?? null;
+  const url = new URL(href, "https://zealy.io");
+  const segments = url.pathname.split("/").filter(Boolean);
+
+  // Skip trailing "questboard" or "quests" segments from the end
+  let i = segments.length - 1;
+  while (i >= 0 && (segments[i] === "questboard" || segments[i] === "quests")) {
+    i--;
+  }
+
+  return i >= 0 ? segments[i] : null;
 }
 
 export function extractQuestNameFromHtml(innerHTML: string, innerText: string): string {

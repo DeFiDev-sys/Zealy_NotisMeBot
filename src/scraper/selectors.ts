@@ -20,13 +20,13 @@ export function extractQuestIdFromAnchor(anchor: HTMLAnchorElement): string | nu
     return anchor.id;
   }
 
-  const href = new URL(anchor.href, "https://zealy.io").href;
-  const segments = href.split("/").filter(Boolean);
+  const url = new URL(anchor.href, "https://zealy.io");
+  const segments = url.pathname.split("/").filter(Boolean);
 
-  // Try to extract from URL path segments
-  const possibleIds = segments.slice(-2);
-  for (const seg of possibleIds) {
-    if (seg.length > 0 && seg !== "questboard") {
+  // Look for quest-like segments from the end
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const seg = segments[i];
+    if (seg.length > 0 && seg !== "questboard" && seg !== "quests") {
       return seg;
     }
   }
