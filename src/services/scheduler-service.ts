@@ -58,7 +58,16 @@ async function processProject(project: {
     const isInitialScan = project.questCount === 0;
     const shouldNotify = !isInitialScan || project.notifyOnInitialScan;
 
-    if (result.newQuests.length > 0) {
+    // Filter: only notify about quests discovered at least 0.2s ago
+    // This ensures tasks are "settled" in the system before notification
+    const minDiscoveryAgeMs = 200;
+    const now = new Date();
+    const recentlyDiscovered = result.newQuests.filter(
+      (quest) => now.getTime() - (quest.detectedAt?.getTime() ?? now.getTime()) >= minDiscoveryAgeMs
+    );
+    const skippedCount = result.newQuests.length - recentlyDiscovered.length;
+
+    if (recentlyDiscovered.length > 0) {
       const owner = await prisma.telegramOwner.findFirst();
       if (owner) {
         if (shouldNotify) {
@@ -66,21 +75,30 @@ async function processProject(project: {
             owner.chatId,
             project.projectName,
             project.projectSlug,
-            result.newQuests
+            recentlyDiscovered
           );
 
-          for (const quest of result.newQuests) {
+          for (const quest of recentlyDiscovered) {
             await questService.markNotificationSent(quest.questId);
           }
 
-          await notificationService.logNotification(
-            project.id,
-            `New quests: ${result.newQuests.map((q) => q.questName).join(", ")}`,
-            "SENT"
-          );
+          // Log that some quests were too recent and were skipped
+          if (skippedCount > 0) {
+            await notificationService.logNotification(
+              project.id,
+              `New quests: ${recentlyDiscovered.map((q) => q.questName).join(", ")} (${skippedCount} delayed)`,
+              "SENT"
+            );
+          } else {
+            await notificationService.logNotification(
+              project.id,
+              `New quests: ${recentlyDiscovered.map((q) => q.questName).join(", ")}`,
+              "SENT"
+            );
+          }
         } else {
           // Initial scan with notifyOnInitialScan = false: mark as sent but don't notify
-          for (const quest of result.newQuests) {
+          for (const quest of recentlyDiscovered) {
             await questService.markNotificationSent(quest.questId);
           }
           logger.info({ projectId: project.id, projectName: project.projectName }, "Initial scan completed, notifications skipped (notifyOnInitialScan=false)");
@@ -88,6 +106,8 @@ async function processProject(project: {
       } else {
         logger.warn({ projectId: project.id }, "No Telegram owner found; new quests saved but not notified");
       }
+    } else {
+      logger.debug({ projectId: project.id }, "No recent new quests to notify (all discovered within 200ms)");
     }
 
     return { projectId: project.id, projectName: project.projectName, projectSlug: project.projectSlug, scanned: true, questsFound: result.questsFound, newQuests: result.newQuestsFound };
@@ -122,6 +142,7 @@ async function sendCycleSummary(results: ScanResultSummary[]) {
   }
 
   const totalNew = scannedProjects.reduce((sum, r) => sum + r.newQuests, 0);
+  //const totalQuests = scannedProjects.reduce((sum, r) => sum + r.questsFound, 0);
   // Only count real errors: scanned projects with an error (exclude "Already scanning", "Paused", "Not due")
   const hasErrors = scannedProjects.some(r => r.error);
 

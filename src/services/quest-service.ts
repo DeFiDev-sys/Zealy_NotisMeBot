@@ -44,6 +44,7 @@ export const questService: QuestService = {
 
     for (const quest of quests) {
       try {
+        const detectedAt = quest.detectedAt ?? new Date();
         const createdQuest = await prisma.quest.create({
           data: {
             questId: quest.questId,
@@ -51,8 +52,8 @@ export const questService: QuestService = {
             questName: quest.questName,
             questUrl: quest.questUrl,
             reward: quest.reward,
-            firstDetectedAt: quest.detectedAt,
-            lastSeenAt: quest.detectedAt,
+            firstDetectedAt: detectedAt,
+            lastSeenAt: detectedAt,
             notificationSent: false,
           },
         });
@@ -64,7 +65,7 @@ export const questService: QuestService = {
           questName: createdQuest.questName,
           questUrl: createdQuest.questUrl,
           reward: createdQuest.reward,
-          detectedAt: createdQuest.firstDetectedAt,
+          detectedAt: createdQuest.firstDetectedAt ?? new Date(),
         });
       } catch (error) {
         if (error instanceof Error && error.message.includes("Unique constraint")) {

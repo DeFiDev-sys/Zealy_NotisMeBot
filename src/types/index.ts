@@ -11,7 +11,7 @@ export interface NormalizedQuest {
   questName: string;
   questUrl: string;
   reward: string | null;
-  detectedAt: Date;
+  detectedAt: Date | null;
 }
 
 export interface ScanResult {

@@ -12,6 +12,7 @@ interface AnchorData {
   href: string;
   innerHTML: string;
   innerText: string;
+  parentText?: string;
 }
 
 export interface PageDiagnostics {
@@ -28,35 +29,56 @@ export interface PageDiagnostics {
 }
 
 const EXTRACT_ANCHORS_SCRIPT = `
-() => {
-  // Find all anchors that might be quest links
+(() => {
+  // Find all anchors that might be quest links - match both /questboard/ and /cw/.../questboard/
   const anchors = document.querySelectorAll('a[href*="/questboard/"]');
-  return Array.from(anchors).map(anchor => ({
-    id: anchor.id,
-    href: anchor.href,
-    innerHTML: anchor.innerHTML,
-    innerText: anchor.innerText,
-  }));
-}
+  return Array.from(anchors).map(anchor => {
+    // Get parent quest card text for reward extraction
+    let parentText = '';
+    let parent = anchor.parentElement;
+    let depth = 0;
+    while (parent && depth < 5) {
+      if (parent.className.includes('quest-card') || parent.className.includes('z-0') || parent.tagName === 'DIV') {
+        parentText = parent.textContent || '';
+        break;
+      }
+      parent = parent.parentElement;
+      depth++;
+    }
+    return {
+      id: anchor.id,
+      href: anchor.href,
+      innerHTML: anchor.innerHTML,
+      innerText: anchor.innerText,
+      parentText: parentText,
+    };
+  });
+})()
 `;
 
-// Additional script to find quest cards that might not be direct anchors
 const EXTRACT_QUEST_CARDS_SCRIPT = `
-() => {
-  const cards = document.querySelectorAll('[class*="quest"], [class*="card"], [data-testid*="quest"], [data-testid*="card"]');
-  return Array.from(cards).map(card => {
-    // Find anchor inside the card
-    const anchor = card.querySelector('a[href*="/questboard/"]') || card.closest('a[href*="/questboard/"]');
-    if (!anchor) return null;
-
-    return {
-      id: anchor.id || card.id,
-      href: anchor.href,
-      innerHTML: anchor.innerHTML || card.innerHTML,
-      innerText: anchor.innerText || card.innerText,
-    };
-  }).filter(Boolean);
-}
+(() => {
+  // Find quest cards as divs that contain anchors with /questboard/ links
+  // Using the same selectors as quick-test.ts that successfully found 27 quests
+  const cards = document.querySelectorAll(
+    'div[class*="quest-card"], div[class*="z-0"], div[class*="quest-card-gradient"], ' +
+    'div[data-state], div[type="button"][class*="quest-card"]'
+  );
+  return Array.from(cards)
+    .filter(card => card.querySelector('a[href*="/questboard/"]') !== null)
+    .map(card => {
+      const anchor = card.querySelector('a[href*="/questboard/"]');
+      if (!anchor) return null;
+      return {
+        id: anchor.id || card.id,
+        href: anchor.href,
+        innerHTML: anchor.innerHTML,
+        innerText: anchor.innerText || card.textContent || '',
+        parentText: card.textContent || '',
+      };
+    })
+    .filter(Boolean);
+})()
 `;
 
 export class ZealyQuestScraper {
@@ -68,34 +90,12 @@ export class ZealyQuestScraper {
 
     this.browser = await chromium.launch({
       headless: env.SCRAPER_HEADLESS,
-      args: [
-        '--disable-blink-features=AutomationControlled',
-        '--disable-features=IsolateOrigins,site-per-process',
-      ],
     });
 
     this.context = await this.browser.newContext({
       userAgent:
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
       viewport: { width: 1280, height: 720 },
-      locale: "en-US",
-      timezoneId: "America/New_York",
-      extraHTTPHeaders: {
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-User": "?1",
-        "Sec-Fetch-Dest": "document",
-        "Upgrade-Insecure-Requests": "1",
-      },
-    });
-
-    // Add script to hide webdriver property
-    await this.context.addInitScript(() => {
-      Object.defineProperty(navigator, 'webdriver', {
-        get: () => undefined,
-      });
     });
 
     logger.info("Playwright browser initialized with anti-detection");
@@ -166,18 +166,18 @@ export class ZealyQuestScraper {
         };
 
         // Use type assertion to bypass strict type checking for DOM queries
-        const allAnchors: Array<{
+        const rawAnchors: Array<{
           href: string;
           id: string | null;
           classes: string;
           text: string;
         }> = [];
 
-        const rawAnchors = document.querySelectorAll("a");
-        for (let i = 0; i < rawAnchors.length; i++) {
-          const a = rawAnchors.item(i);
+        const allAnchors = document.querySelectorAll("a");
+        for (let i = 0; i < allAnchors.length; i++) {
+          const a = allAnchors[i];
           if (a && a.nodeType === 1) { // Node type 1 = ELEMENT_NODE
-            allAnchors.push({
+            rawAnchors.push({
               href: a.href,
               id: a.id,
               classes: a.className,
@@ -186,7 +186,7 @@ export class ZealyQuestScraper {
           }
         }
 
-        const questboardAnchors = allAnchors.filter(
+        const questboardAnchors = rawAnchors.filter(
           (a) => a.href.includes("/questboard/") || a.href.includes("/quest/")
         );
 
@@ -206,7 +206,7 @@ export class ZealyQuestScraper {
             "h1, h2, h3, h4": count("h1, h2, h3, h4"),
           },
           anchorSample: questboardAnchors.slice(0, 25),
-          allAnchorSample: allAnchors.slice(0, 25),
+          allAnchorSample: rawAnchors.slice(0, 25),
         };
       });
 
@@ -243,7 +243,7 @@ export class ZealyQuestScraper {
         waitUntil: "domcontentloaded",
         timeout: env.SCRAPER_TIMEOUT,
       });
-      logger.debug({ url, projectSlug }, "Page loaded, waiting for quest content");
+      logger.debug({ url, projectSlug }, "Page loaded");
 
       // Wait for network to settle
       try {
@@ -252,11 +252,10 @@ export class ZealyQuestScraper {
         logger.warn({ projectSlug }, "Network idle timeout, continuing anyway");
       }
 
-      // Wait for quest content with more flexible selectors
-      await this.waitForQuestContent(page);
-
-      // Scroll to trigger lazy loading / infinite scroll
+      // Scroll FIRST to trigger lazy loading (this is what quick-test does that works)
       await this.scrollToLoadMore(page);
+
+      // No need to wait for quest content - we just scroll and extract like quick-test
 
       // Extract anchors using multiple strategies
       let anchorData: AnchorData[] = [];
@@ -325,8 +324,38 @@ export class ZealyQuestScraper {
   }
 
   private async waitForQuestContent(page: Page): Promise<void> {
+    // Quick check first - don't wait long if content is already there
+    try {
+      const hasAnchors = await page.evaluate(() => {
+        return document.querySelectorAll('a[href*="/questboard/"]').length > 0;
+      });
+      if (hasAnchors) {
+        logger.debug("Questboard anchors already present");
+        await page.waitForTimeout(1000);
+        return;
+      }
+    } catch {
+      // Continue to wait
+    }
+
+    // Wait for SPA hydration with reasonable timeout
+    try {
+      await page.waitForFunction(() => {
+        return document.querySelectorAll('a[href*="/questboard/"]').length > 0;
+      }, { timeout: 15000 });
+
+      logger.debug("Found questboard anchors via waitForFunction");
+      await page.waitForTimeout(1500);
+      return;
+    } catch (err) {
+      logger.warn({ error: err instanceof Error ? err.message : String(err) },
+        "Timed out waiting for questboard anchors via function");
+    }
+
+    // Fallback to selector-based approach with shorter timeouts
     const selectorsToTry = [
       'a[href*="/questboard/"]',
+      'a[href*="/cw/"]',
       '[class*="quest"]',
       '[data-testid*="quest"]',
       '[class*="card"] a[href*="/quest"]',
@@ -335,18 +364,20 @@ export class ZealyQuestScraper {
     for (const selector of selectorsToTry) {
       try {
         await page.waitForSelector(selector, {
-          timeout: 15000,
+          timeout: 10000,
           state: "attached",
         });
         logger.debug({ selector }, "Found quest content with selector");
-        await page.waitForTimeout(1500); // Extra time for dynamic content
+        await page.waitForTimeout(1500);
         return;
       } catch {
         // Try next selector
       }
     }
 
-    logger.warn({ projectSlug: "" }, "Quest anchors not found with any selector within timeout, continuing anyway");
+    logger.warn({ projectSlug: "" },
+      "Quest anchors not found with any selector, falling back to time-based wait");
+    await page.waitForTimeout(3000);
   }
 
   private async scrollToLoadMore(page: Page): Promise<void> {
@@ -398,7 +429,7 @@ export class ZealyQuestScraper {
     }
 
     const questName = this.extractQuestNameFromHtml(data.innerHTML, data.innerText);
-    const reward = this.extractRewardFromText(data.innerText);
+    const reward = this.extractRewardFromText(data.innerText, data.parentText || "");
     const questUrl = new URL(data.href, "https://zealy.io").href;
 
     return {
@@ -442,19 +473,32 @@ export class ZealyQuestScraper {
 
   private extractQuestNameFromHtml(innerHTML: string, innerText: string): string {
     const strategies = [
+      () => this.extractFromVisibleText(innerText),
       () => this.extractFromHeading(innerHTML),
       () => this.extractFromTitleClass(innerHTML),
-      () => this.extractFromVisibleText(innerText),
     ];
 
     for (const strategy of strategies) {
       const name = strategy();
       if (name && name.trim().length > 0 && name.trim() !== "Unnamed Quest") {
-        return name.trim();
+        return this.decodeHtmlEntities(name.trim());
       }
     }
 
     return "Unnamed Quest";
+  }
+
+  private decodeHtmlEntities(text: string): string {
+    return text
+      .replace(/&nbsp;/g, " ")
+      .replace(/&/g, "&")
+      .replace(/</g, "<")
+      .replace(/>/g, ">")
+      .replace(/"/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/'/g, "'")
+      .replace(/'/g, "'")
+      .trim();
   }
 
   private extractFromHeading(html: string): string | null {
@@ -503,8 +547,15 @@ export class ZealyQuestScraper {
     return !invalidPatterns.some((pattern) => pattern.test(lower));
   }
 
-  private extractRewardFromText(text: string): string | null {
-    const xpMatch = text.match(/(\d+(?:,\d{3})*(?:\.\d+)?)\s*xp/i);
+  private extractRewardFromText(text: string, parentText: string = ""): string | null {
+    const combinedText = text + " " + parentText;
+    // Try pattern with space: "100 XP" or "100 xp"
+    let xpMatch = combinedText.match(/(\d+(?:,\d{3})*(?:\.\d+)?)\s*xp/i);
+    if (xpMatch) {
+      return xpMatch[1].replace(/,/g, "") + " XP";
+    }
+    // Try pattern without space: "Xp100" or "XP100" or "xp100"
+    xpMatch = combinedText.match(/xp\s*(\d+(?:,\d{3})*(?:\.\d+)?)/i);
     if (xpMatch) {
       return xpMatch[1].replace(/,/g, "") + " XP";
     }
