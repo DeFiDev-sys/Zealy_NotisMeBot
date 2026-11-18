@@ -1,6 +1,6 @@
 packages:
   - .
-allowedBuildScripts:
+allowBuilds:
   - "@prisma/client"
   - "@prisma/engines"
   - "prisma"
