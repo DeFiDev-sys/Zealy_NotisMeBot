@@ -33,6 +33,9 @@ ENV SCRAPER_HEADLESS=true
 # Ensure Playwright uses a cache directory accessible by node user
 ENV PLAYWRIGHT_BROWSERS_PATH=/app/.cache/ms-playwright
 
+# Create cache directory with correct permissions BEFORE switching to node user
+RUN mkdir -p /app/.cache/ms-playwright && chown -R node:node /app/.cache
+
 # Run as non-root
 USER node
 
