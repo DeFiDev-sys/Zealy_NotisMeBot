@@ -1,0 +1,7 @@
+packages:
+  - .
+allowedBuildScripts:
+  - "@prisma/client"
+  - "@prisma/engines"
+  - "prisma"
+  - "esbuild"

@@ -15,9 +15,7 @@ WORKDIR /app
 RUN corepack enable pnpm
 
 # Install dependencies first (better caching)
-COPY package.json pnpm-lock.yaml ./
-# Approve build scripts for Prisma and esbuild
-RUN pnpm approve-builds @prisma/client @prisma/engines prisma esbuild --add
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # Generate Prisma client
