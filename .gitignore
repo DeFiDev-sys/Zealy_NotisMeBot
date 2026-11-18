@@ -3,8 +3,6 @@ dist/
 .env
 .env.example
 *.log
-dev.db
-dev.db-journal
 *.sqlite
 *.sqlite-journal
 .DS_Store
