@@ -142,12 +142,14 @@ async function sendCycleSummary(results: ScanResultSummary[]) {
   }
 
   const totalNew = scannedProjects.reduce((sum, r) => sum + r.newQuests, 0);
-  const totalQuests = scannedProjects.reduce((sum, r) => sum + r.questsFound, 0);
+  //const totalQuests = scannedProjects.reduce((sum, r) => sum + r.questsFound, 0);
   const hasErrors = scannedProjects.some(r => r.error);
 
   if (totalNew === 0 && !hasErrors) {
     return;
   }
+
+  const totalQuests = scannedProjects.reduce((sum, r) => sum + r.questsFound, 0);
 
   const lines = [
     "📊 <b>Scheduled Scan Complete</b>",
