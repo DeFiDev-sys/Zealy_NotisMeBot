@@ -1,7 +1,7 @@
-import { connectDatabase, disconnectDatabase } from "./database/prisma";
-import { createBot, startBot, stopBot } from "./bot/bot";
-import { schedulerService } from "./services/scheduler-service";
-import { createLogger } from "./utils/logger";
+import { connectDatabase, disconnectDatabase } from "./database/prisma.js";
+import { createBot, startBot, stopBot } from "./bot/bot.js";
+import { schedulerService } from "./services/scheduler-service.js";
+import { createLogger } from "./utils/logger.js";
 
 const logger = createLogger("main");
 
