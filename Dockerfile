@@ -16,6 +16,8 @@ RUN corepack enable pnpm
 
 # Install dependencies first (better caching)
 COPY package.json pnpm-lock.yaml ./
+# Approve build scripts for Prisma and esbuild
+RUN pnpm approve-builds @prisma/client @prisma/engines prisma esbuild --add
 RUN pnpm install --frozen-lockfile
 
 # Generate Prisma client
