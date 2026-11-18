@@ -1,0 +1,45 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build output
+dist
+
+# Database
+*.db
+*.db-journal
+data/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test
+coverage
+.nyc_output
+
+# Misc
+*.png
+*.jpg
+*.jpeg
+test-page.html
+output.txt
+
+# Git
+.git
+.gitignore
