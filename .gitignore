@@ -5,6 +5,7 @@ dist/
 *.log
 *.sqlite
 *.sqlite-journal
+dev.db-journal
 .DS_Store
 coverage/
 .vscode/
