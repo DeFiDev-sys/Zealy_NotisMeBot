@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "build": "prisma generate && tsc",
+    "build": "prisma generate && tsc && pnpm exec playwright install chromium",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "prisma generate",
