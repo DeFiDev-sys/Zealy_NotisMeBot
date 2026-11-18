@@ -26,13 +26,13 @@ RUN pnpm db:generate
 COPY . .
 RUN pnpm build
 
-# Persistent volume for SQLite (Railway mounts volumes here)
-VOLUME ["/app/data"]
-
 # Environment defaults
 ENV DATABASE_URL="file:/app/data/dev.db"
 ENV NODE_ENV=production
 ENV SCRAPER_HEADLESS=true
+
+# Ensure data directory exists (Railway Volume mounts here)
+RUN mkdir -p /app/data
 
 # Run as non-root (optional but good practice)
 USER node
