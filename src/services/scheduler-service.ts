@@ -1,6 +1,6 @@
 import { projectService } from "./project-service";
 import { scanService } from "./scan-service";
-import { notificationService } from "./notification-service";
+import { notificationService, escapeHtml } from "./notification-service";
 import { questService } from "./quest-service";
 import { prisma } from "../database/prisma";
 import { createLogger } from "../utils/logger";
@@ -138,44 +138,31 @@ async function sendCycleSummary(results: ScanResultSummary[]) {
   const scannedProjects = results.filter(r => r.scanned);
 
   if (scannedProjects.length === 0) {
-    return; // No projects scanned, no summary needed
+    return;
   }
 
   const totalNew = scannedProjects.reduce((sum, r) => sum + r.newQuests, 0);
-  //const totalQuests = scannedProjects.reduce((sum, r) => sum + r.questsFound, 0);
-  // Only count real errors: scanned projects with an error (exclude "Already scanning", "Paused", "Not due")
+  const totalQuests = scannedProjects.reduce((sum, r) => sum + r.questsFound, 0);
   const hasErrors = scannedProjects.some(r => r.error);
 
-  // Stay quiet if nothing new and no errors
   if (totalNew === 0 && !hasErrors) {
     return;
   }
 
-  const totalQuests = scannedProjects.reduce((sum, r) => sum + r.questsFound, 0);
-
   const lines = [
-    `📊 <b>Scheduled Scan Complete</b>`,
+    "📊 <b>Scheduled Scan Complete</b>",
     `⏰ ${new Date().toLocaleTimeString()}`,
     ``,
-    `Projects Scanned: ${scannedProjects.length}`,
-    `Total Quests Found: ${totalQuests}`,
-    `Total New Quests: ${totalNew}`,
-    ``,
+    `📍 ${scannedProjects.length} Projects Scanned`,
+    `📊 ${totalQuests} Quests Found`,
+    `🚀 ${totalNew} New`,
   ];
 
-  for (const r of scannedProjects) {
-    const status = r.error ? "❌" : (r.newQuests > 0 ? "🔔" : "✅");
-    lines.push(`${status} ${r.projectName}: ${r.questsFound} quests, ${r.newQuests} new${r.error ? ` (${r.error})` : ""}`);
-  }
-
-  if (hasErrors) {
-    lines.push(``, `⚠ Some scans had errors - check logs`);
-  }
-
   const message = lines.join("\n");
+  const safeMessage = escapeHtml(message);
 
   try {
-    await notificationService.sendCycleSummaryNotification(owner.chatId, message);
+    await notificationService.sendCycleSummaryNotification(owner.chatId, safeMessage);
   } catch (error) {
     logger.error({ error }, "Failed to send cycle summary notification");
   }

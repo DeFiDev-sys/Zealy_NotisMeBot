@@ -13,7 +13,7 @@ const MAX_NOTIFICATION_LOGS_PER_PROJECT = 50;
  * to prevent Telegram HTML parser errors (e.g. a stray <3).
  * Only the characters that would break a tag are escaped.
  */
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
