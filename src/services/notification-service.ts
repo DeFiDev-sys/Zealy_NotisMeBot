@@ -1,7 +1,7 @@
-import { prisma } from "../database/prisma";
-import { NormalizedQuest, NotificationStatus } from "../types";
-import { createLogger } from "../utils/logger";
-import { env } from "../config/env";
+import { prisma } from "../database/prisma.js";
+import { NormalizedQuest, NotificationStatus } from "../types/index.js";
+import { createLogger } from "../utils/logger.js";
+import { env } from "../config/env.js";
 import { Telegraf } from "telegraf";
 
 const logger = createLogger("notification-service");

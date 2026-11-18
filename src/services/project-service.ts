@@ -1,7 +1,7 @@
-import { prisma } from "../database/prisma";
-import { ParsedZealyUrl, ProjectWithStats } from "../types";
-import { parseZealyUrl } from "../utils/zealy-url";
-import { createLogger } from "../utils/logger";
+import { prisma } from "../database/prisma.js";
+import { ParsedZealyUrl, ProjectWithStats } from "../types/index.js";
+import { parseZealyUrl } from "../utils/zealy-url.js";
+import { createLogger } from "../utils/logger.js";
 
 const logger = createLogger("project-service");
 

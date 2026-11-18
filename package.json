@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Telegram bot that monitors Zealy questboards for new quests",
   "main": "dist/index.js",
+  "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",

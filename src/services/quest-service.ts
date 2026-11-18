@@ -1,6 +1,6 @@
-import { prisma } from "../database/prisma";
-import { NormalizedQuest } from "../types";
-import { createLogger } from "../utils/logger";
+import { prisma } from "../database/prisma.js";
+import { NormalizedQuest } from "../types/index.js";
+import { createLogger } from "../utils/logger.js";
 
 const logger = createLogger("quest-service");
 

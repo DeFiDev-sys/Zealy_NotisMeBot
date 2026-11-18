@@ -1,5 +1,5 @@
-import { NormalizedQuest } from "../types";
-import { extractQuestIdFromAnchor, isQuestAnchor } from "./selectors";
+import { NormalizedQuest } from "../types/index.js";
+import { extractQuestIdFromAnchor, isQuestAnchor } from "./selectors.js";
 
 export function normalizeQuestUrl(href: string, baseUrl: string = "https://zealy.io"): string {
   try {

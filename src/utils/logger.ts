@@ -1,5 +1,5 @@
-import pino from "pino";
-import { env } from "../config/env";
+import { pino } from "pino";
+import { env } from "../config/env.js";
 
 const transport = {
   target: "pino-pretty",
@@ -10,10 +10,12 @@ const transport = {
   },
 };
 
-export const logger = pino({
+const pinoLogger = pino({
   level: env.LOG_LEVEL,
   transport: env.LOG_LEVEL !== "silent" ? transport : undefined,
 });
+
+export const logger = pinoLogger;
 
 export function createLogger(context: string) {
   return logger.child({ context });

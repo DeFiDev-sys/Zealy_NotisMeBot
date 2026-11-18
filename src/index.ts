@@ -1,11 +1,11 @@
 import { mkdirSync } from "fs";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
-import { connectDatabase, disconnectDatabase } from "./database/prisma";
-import { createBot, startBot, stopBot } from "./bot/bot";
-import { schedulerService } from "./services/scheduler-service";
-import { createLogger } from "./utils/logger";
-import { env } from "./config/env";
+import { connectDatabase, disconnectDatabase } from "./database/prisma.js";
+import { createBot, startBot, stopBot } from "./bot/bot.js";
+import { schedulerService } from "./services/scheduler-service.js";
+import { createLogger } from "./utils/logger.js";
+import { env } from "./config/env.js";
 
 const logger = createLogger("main");
 

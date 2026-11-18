@@ -15,10 +15,10 @@
  * 5. Report any console errors
  * 6. Save a full HTML dump and screenshot
  */
-import { ZealyQuestScraper } from "../scraper/zealy-scraper";
+import { ZealyQuestScraper } from "../scraper/zealy-scraper.js";
 import * as fs from "fs";
 import * as path from "path";
-import { PageDiagnostics } from "../scraper/zealy-scraper";
+import { PageDiagnostics } from "../scraper/zealy-scraper.js";
 
 async function main() {
   const url = process.argv[2];

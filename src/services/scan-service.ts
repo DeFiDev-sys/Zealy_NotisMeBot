@@ -1,9 +1,9 @@
-import { prisma } from "../database/prisma";
-import { ScanResult } from "../types";
-import { ZealyQuestScraper } from "../scraper/zealy-scraper";
-import { questService } from "./quest-service";
-import { projectService } from "./project-service";
-import { createLogger } from "../utils/logger";
+import { prisma } from "../database/prisma.js";
+import { ScanResult } from "../types/index.js";
+import { ZealyQuestScraper } from "../scraper/zealy-scraper.js";
+import { questService } from "./quest-service.js";
+import { projectService } from "./project-service.js";
+import { createLogger } from "../utils/logger.js";
 
 const logger = createLogger("scan-service");
 
