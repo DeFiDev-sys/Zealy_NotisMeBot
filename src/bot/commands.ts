@@ -1,12 +1,12 @@
 import { Telegraf, Context, Markup } from "telegraf";
-import { projectService } from "../services/project-service.js";
-import { scanService } from "../services/scan-service.js";
-import { ownerService } from "../services/owner-service.js";
-import { notificationService } from "../services/notification-service.js";
-import { schedulerService } from "../services/scheduler-service.js";
-import { prisma } from "../database/prisma.js";
-import { env, isOwner } from "../config/env.js";
-import { createLogger } from "../utils/logger.js";
+import { projectService } from "../services/project-service";
+import { scanService } from "../services/scan-service";
+import { ownerService } from "../services/owner-service";
+import { notificationService } from "../services/notification-service";
+import { schedulerService } from "../services/scheduler-service";
+import { prisma } from "../database/prisma";
+import { env, isOwner } from "../config/env";
+import { createLogger } from "../utils/logger";
 
 const logger = createLogger("bot-commands");
 

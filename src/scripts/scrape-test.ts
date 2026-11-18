@@ -14,7 +14,7 @@
  * 4. Log detailed debugging information
  * 5. Save a debug screenshot and page HTML for inspection
  */
-import { ZealyQuestScraper } from "../scraper/zealy-scraper.js";
+import { ZealyQuestScraper } from "../scraper/zealy-scraper";
 import * as fs from "fs";
 import * as path from "path";
 

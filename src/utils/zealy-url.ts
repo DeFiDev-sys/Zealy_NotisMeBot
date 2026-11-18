@@ -1,4 +1,4 @@
-import { ParsedZealyUrl } from "../types/index.js";
+import { ParsedZealyUrl } from "../types";
 
 const ZEALY_URL_PATTERN = /^https?:\/\/(?:www\.)?zealy\.io\/cw\/([a-zA-Z0-9\-]+)\/questboard\/?$/i;
 

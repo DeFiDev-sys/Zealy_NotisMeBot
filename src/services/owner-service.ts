@@ -1,5 +1,5 @@
-import { prisma } from "../database/prisma.js";
-import { createLogger } from "../utils/logger.js";
+import { prisma } from "../database/prisma";
+import { createLogger } from "../utils/logger";
 
 const logger = createLogger("owner-service");
 

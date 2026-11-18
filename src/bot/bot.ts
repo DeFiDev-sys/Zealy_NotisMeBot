@@ -1,7 +1,7 @@
 import { Telegraf, Context } from "telegraf";
-import { env, isOwner } from "../config/env.js";
-import { registerCommands } from "./commands.js";
-import { createLogger } from "../utils/logger.js";
+import { env, isOwner } from "../config/env";
+import { registerCommands } from "./commands";
+import { createLogger } from "../utils/logger";
 
 const logger = createLogger("bot");
 

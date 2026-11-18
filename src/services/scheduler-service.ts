@@ -1,11 +1,11 @@
-import { projectService } from "./project-service.js";
-import { scanService } from "./scan-service.js";
-import { notificationService } from "./notification-service.js";
-import { questService } from "./quest-service.js";
-import { prisma } from "../database/prisma.js";
-import { createLogger } from "../utils/logger.js";
-import { env } from "../config/env.js";
-import { ConcurrencyLimiter } from "../utils/concurrency-limiter.js";
+import { projectService } from "./project-service";
+import { scanService } from "./scan-service";
+import { notificationService } from "./notification-service";
+import { questService } from "./quest-service";
+import { prisma } from "../database/prisma";
+import { createLogger } from "../utils/logger";
+import { env } from "../config/env";
+import { ConcurrencyLimiter } from "../utils/concurrency-limiter";
 
 const logger = createLogger("scheduler-service");
 
@@ -92,7 +92,7 @@ async function processProject(project: {
           } else {
             await notificationService.logNotification(
               project.id,
-              `New quests: ${recentlyDiscovered.map((q: { questName: string }) => q.questName).join(", ")}`,
+              `New quests: ${recentlyDiscovered.map((q) => q.questName).join(", ")}`,
               "SENT"
             );
           }

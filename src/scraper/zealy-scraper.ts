@@ -1,9 +1,9 @@
 import { chromium, Browser, Page, BrowserContext } from "playwright";
-import { NormalizedQuest, ScanResult } from "../types/index.js";
-import { buildNormalizedQuest } from "./quest-extractor.js";
-import { isQuestAnchor, extractQuestIdFromAnchor } from "./selectors.js";
-import { createLogger } from "../utils/logger.js";
-import { env } from "../config/env.js";
+import { NormalizedQuest, ScanResult } from "../types";
+import { buildNormalizedQuest } from "./quest-extractor";
+import { isQuestAnchor, extractQuestIdFromAnchor } from "./selectors";
+import { createLogger } from "../utils/logger";
+import { env } from "../config/env";
 
 const logger = createLogger("zealy-scraper");
 
