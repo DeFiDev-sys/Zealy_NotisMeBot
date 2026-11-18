@@ -2,7 +2,7 @@ import { Telegraf, Context, Markup } from "telegraf";
 import { projectService } from "../services/project-service";
 import { scanService } from "../services/scan-service";
 import { ownerService } from "../services/owner-service";
-import { notificationService, escapeHtml } from "../services/notification-service";
+import { notificationService } from "../services/notification-service";
 import { schedulerService } from "../services/scheduler-service";
 import { prisma } from "../database/prisma";
 import { env, isOwner } from "../config/env";
@@ -191,12 +191,11 @@ async function handleAddProject(ctx: Context) {
         { parse_mode: "HTML" }
       );
     } catch (scanError) {
-      const safeError = escapeHtml(scanError instanceof Error ? scanError.message : "Unknown error");
       await ctx.telegram.editMessageText(
         chatId,
         statusMsg.message_id,
         undefined,
-        `⚠ <b>Project Added</b> but initial scan failed:\n${safeError}\n\n` +
+        `⚠ <b>Project Added</b> but initial scan failed:\n${scanError instanceof Error ? scanError.message : "Unknown error"}\n\n` +
           `🏗 <b>${project.projectName}</b>\n` +
           `🔗 ${project.url}\n` +
           `⏱ Interval: ${project.scanIntervalMinutes} minutes\n\n` +
@@ -205,7 +204,7 @@ async function handleAddProject(ctx: Context) {
       );
     }
   } catch (error) {
-    const message = escapeHtml(error instanceof Error ? error.message : "Failed to add project");
+    const message = error instanceof Error ? error.message : "Failed to add project";
     await ctx.reply(`❌ ${message}`);
   }
 }
@@ -249,12 +248,11 @@ async function handleScan(ctx: Context) {
         { parse_mode: "HTML" }
       );
     } catch (error) {
-      const safeError = escapeHtml(error instanceof Error ? error.message : "Unknown error");
       await ctx.telegram.editMessageText(
         chatId,
         statusMsg.message_id,
         undefined,
-        `❌ Scan failed: ${safeError}`,
+        `❌ Scan failed: ${error instanceof Error ? error.message : "Unknown error"}`,
         { parse_mode: "HTML" }
       );
     }
@@ -335,7 +333,7 @@ async function handleScanAll(ctx: Context) {
       totalNew += result.newQuestsFound;
       results.push(`✅ ${project.projectName}: ${result.questsFound} quests, ${result.newQuestsFound} new`);
     } catch (error) {
-      const msg = escapeHtml(error instanceof Error ? error.message : "Unknown error");
+      const msg = error instanceof Error ? error.message : "Unknown error";
       results.push(`❌ ${project.projectName}: ${msg}`);
       logger.error({ error, projectId: project.id }, "Force scan failed");
     }

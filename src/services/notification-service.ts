@@ -8,20 +8,6 @@ const logger = createLogger("notification-service");
 
 const MAX_NOTIFICATION_LOGS_PER_PROJECT = 50;
 
-/**
- * Escape HTML special characters in user-provided content
- * to prevent Telegram HTML parser errors (e.g. a stray <3).
- * Only the characters that would break a tag are escaped.
- */
-export function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 export interface NotificationService {
   sendNewQuestsNotification(
     chatId: string,
@@ -50,22 +36,15 @@ function formatQuestMessage(projectName: string, quests: NormalizedQuest[]): str
   ];
 
   for (const quest of quests) {
-    // Escape stray < or > that could break Telegram's HTML parser
-    const safeQuestName = quest.questName.replace(/[<>]/g, c => `&#${c.charCodeAt(0)};`);
-    lines.push(`📌 ${safeQuestName}`);
+    lines.push(`📌 ${quest.questName}`);
     if (quest.reward) {
-      const safeReward = quest.reward.replace(/[<>]/g, c => `&#${c.charCodeAt(0)};`);
-      lines.push(`💎 Reward: ${safeReward}`);
+      lines.push(`💎 Reward: ${quest.reward}`);
     }
-    // Escape any stray < > in the URL anchor text (the URL itself is already safe)
-    const safeUrlText = "Open Quest"; // static text, no escaping needed
     lines.push(`🔗 <a href="${quest.questUrl}">Open Quest</a>`);
     lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━");
   }
 
-  // Escape the final line to prevent stray <3 etc.
-  const finalLine = `🎯 <b>${quests.length} New Task${quests.length > 1 ? "s" : ""} Available</b>`.replace(/[<>]/g, c => `&#${c.charCodeAt(0)};`);
-  lines.push("", finalLine);
+  lines.push("", `🎯 <b>${quests.length} New Task${quests.length > 1 ? "s" : ""} Available</b>`);
 
   return lines.join("\n");
 }
@@ -111,8 +90,7 @@ export const notificationService: NotificationService = {
     message: string
   ) {
     try {
-      const safeMessage = escapeHtml(message);
-    await bot.telegram.sendMessage(chatId, safeMessage, {
+      await bot.telegram.sendMessage(chatId, message, {
         parse_mode: "HTML",
         link_preview_options: { is_disabled: true },
       });
