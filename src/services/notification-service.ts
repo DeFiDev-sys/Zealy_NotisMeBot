@@ -27,22 +27,36 @@ export interface NotificationService {
   ): Promise<void>;
 }
 
+// src/services/notification-service.ts
+
+// Add this helper function at the top
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+
 function formatQuestMessage(projectName: string, quests: NormalizedQuest[]): string {
   const lines = [
     "🚨 <b>NEW ZEALY QUESTS DETECTED</b>",
     "",
-    `🏗 <b>Project:</b> ${projectName}`,
+    `🏗 <b>Project:</b> ${escapeHtml(projectName)}`,
     "━━━━━━━━━━━━━━━━━━━━━━━━━━",
   ];
 
   for (const quest of quests) {
-    lines.push(`📌 ${quest.questName}`);
-    if (quest.reward) {
-      lines.push(`💎 Reward: ${quest.reward}`);
-    }
-    lines.push(`🔗 <a href="${quest.questUrl}">Open Quest</a>`);
-    lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  lines.push(`📌 ${escapeHtml(quest.questName)}`);
+  if (quest.reward) {
+    lines.push(`💎 Reward: ${escapeHtml(quest.reward)}`);
   }
+  lines.push(`🔗 <a href="${quest.questUrl}">Open Quest</a>`);
+  lines.push("━━━━━━━━━━━━━━━━━━━━━━━━━━");
+}
+
 
   lines.push("", `🎯 <b>${quests.length} New Task${quests.length > 1 ? "s" : ""} Available</b>`);
 

@@ -489,17 +489,17 @@ export class ZealyQuestScraper {
   }
 
   private decodeHtmlEntities(text: string): string {
-    return text
-      .replace(/&nbsp;/g, " ")
-      .replace(/&/g, "&")
-      .replace(/</g, "<")
-      .replace(/>/g, ">")
-      .replace(/"/g, '"')
-      .replace(/&apos;/g, "'")
-      .replace(/'/g, "'")
-      .replace(/'/g, "'")
-      .trim();
-  }
+  return text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .trim();
+}
+
 
   private extractFromHeading(html: string): string | null {
     const headingMatch = html.match(/<h[1-4][^>]*>([^<]+)<\/h[1-4]>/i);

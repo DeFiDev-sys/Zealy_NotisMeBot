@@ -26,6 +26,9 @@ RUN pnpm db:generate
 COPY . .
 RUN pnpm build
 
+# Install Playwright browsers (chromium) in the final image
+RUN pnpm exec playwright install chromium
+
 # Environment defaults (overridden by Railway environment variables)
 ENV DATABASE_URL="postgresql://postgres:password@host:5432/postgres?connection_limit=1&sslmode=require"
 ENV NODE_ENV=production
