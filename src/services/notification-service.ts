@@ -104,7 +104,7 @@ export const notificationService: NotificationService = {
     message: string
   ) {
     try {
-      await bot.telegram.sendMessage(chatId, message, {
+      await bot.telegram.sendMessage(chatId, escapeHtml(message), {
         parse_mode: "HTML",
         link_preview_options: { is_disabled: true },
       });

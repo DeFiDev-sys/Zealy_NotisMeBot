@@ -4,8 +4,31 @@ import { buildNormalizedQuest } from "./quest-extractor";
 import { isQuestAnchor, extractQuestIdFromAnchor } from "./selectors";
 import { createLogger } from "../utils/logger";
 import { env } from "../config/env";
+import * as fs from "fs";
+import * as path from "path";
 
 const logger = createLogger("zealy-scraper");
+
+// Resolve Playwright executable path from env (for custom install locations)
+function getExecutablePath(): string | undefined {
+  const customPath = process.env.PLAYWRIGHT_BROWSERS_PATH;
+  if (customPath && fs.existsSync(customPath)) {
+    try {
+      const entries = fs.readdirSync(customPath);
+      for (const entry of entries) {
+        if (entry.startsWith("chromium_headless_shell-")) {
+          const exePath = path.join(customPath, entry, "chrome-headless-shell-linux64", "chrome-headless-shell");
+          if (fs.existsSync(exePath)) {
+            return exePath;
+          }
+        }
+      }
+    } catch {
+      // Ignore, fallback to default
+    }
+  }
+  return undefined;
+}
 
 interface AnchorData {
   id: string;
@@ -88,9 +111,16 @@ export class ZealyQuestScraper {
   async initialize(): Promise<void> {
     if (this.browser) return;
 
-    this.browser = await chromium.launch({
+    const executablePath = getExecutablePath();
+    const launchOptions: { headless: boolean; executablePath?: string } = {
       headless: env.SCRAPER_HEADLESS,
-    });
+    };
+    if (executablePath) {
+      launchOptions.executablePath = executablePath;
+      logger.info({ executablePath }, "Using custom Playwright executable path");
+    }
+
+    this.browser = await chromium.launch(launchOptions);
 
     this.context = await this.browser.newContext({
       userAgent:
