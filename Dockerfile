@@ -15,7 +15,7 @@ WORKDIR /app
 RUN corepack enable pnpm
 
 # Install dependencies first (better caching)
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # Generate Prisma client
